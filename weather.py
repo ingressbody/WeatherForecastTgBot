@@ -30,7 +30,9 @@ LADOGA_COORDS = {
 }
 
 class WeatherBot:
-    def __init__(self):        
+    def __init__(self):
+        self.keyboard = [ ["🌤️ Погода на 3 дня", "🗺️ Текущая локация", "❓ Помощь"] ]     
+        self.keyboard_markup = ReplyKeyboardMarkup(self.keyboard, resize_keyboard=True)   
         self.application = Application.builder().token(BOT_TOKEN).build()
         self.setup_handlers()
         conn = sqlite3.connect("usersdb.sqlite", isolation_level=None)
@@ -52,7 +54,7 @@ class WeatherBot:
         """Настройка обработчиков команд"""
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("weather", self.weather_command))
-        #self.application.add_handler(CommandHandler("location", self.location_command))
+        self.application.add_handler(CommandHandler("location", self.location_command))
         #self.application.add_handler(CommandHandler("set_location", self.set_location_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
@@ -60,19 +62,22 @@ class WeatherBot:
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /start"""
-        keyboard = [
-            ["🌤️ Погода на 3 дня", "📅 Погода на неделю"],
-            ["📍 Обновить местоположение", "❓ Помощь"]
-        ]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-        
         await update.message.reply_text(
             "👋 Добро пожаловать в бот погоды на Ладожском озере!\n\n"
             "Выберите опцию ниже или используйте команды:\n"
             "/weather - текущая погода\n"
             "/help - справка",
-            reply_markup=reply_markup
+            reply_markup = self.keyboard_markup
         )
+
+    async def location_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /location"""
+        user_id = update.message.from_user.id
+        lat,lon = self.get_user_location_db(user_id)
+        if lat and lon:                
+            await update.message.reply_text(f"Текущие координаты: {lat}, {lon}", reply_markup = self.keyboard_markup)
+        else:
+            await update.message.reply_text("Координаты не заданы", reply_markup = self.keyboard_markup)
     
     async def weather_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /weather"""
@@ -87,6 +92,7 @@ class WeatherBot:
 /start - начать работу
 /weather - погода на 3 дня
 /help - эта справка
+/location - заданные координаты
 
 Или используйте кнопки меню для навигации.
 
@@ -96,8 +102,8 @@ class WeatherBot:
 • Направление и скорость ветра
 • Влажность и давление
 """
-        await update.message.reply_text(help_text)
-    
+        await update.message.reply_text(help_text, reply_markup = self.keyboard_markup)
+
 
     def get_user_location_db(self, usertg_id):
         """Взять координаты пользователя из БД"""
@@ -113,23 +119,15 @@ class WeatherBot:
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик текстовых сообщений"""
-        text = update.message.text
-        
-        if text == "🌤️ Погода на 3 дня":
+        text = update.message.text.lower()
+        if text in self.keyboard[0][0].lower():
             await self.send_weather_forecast(update, context, days=3)
-        elif text == "📅 Погода на неделю":
-            await self.send_weather_forecast(update, context, days=7)
-        elif text == "❓ Помощь":
+        elif text in self.keyboard[0][1].lower():
+            await self.location_command(update, context)
+        elif text in self.keyboard[0][2].lower():
             await self.help_command(update, context)
-        elif text == "🗺️ Текущая локация":
-            user_id = update.message.from_user.id
-            lat,lon = self.get_user_location_db(user_id)
-            if lat and lon:                
-                await update.message.reply_text(f"Текущие координаты: {lat}, {lon}")
-            else:
-                await update.message.reply_text("Координаты не заданы")
         else:
-            await update.message.reply_text("Используйте кнопки меню или команды для навигации")
+            await update.message.reply_text("Используйте кнопки меню или команды для навигации", reply_markup = self.keyboard_markup)
 
 
     async def handle_location(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -154,10 +152,7 @@ class WeatherBot:
                 f"📍 Геолокация принята!\n"
                 f"📌 Координаты: {lat:.4f}, {lon:.4f}\n\n"
                 f"Хотите посмотреть погоду для этой точки?",
-                reply_markup=ReplyKeyboardMarkup([
-                    ["🌤️ Погода на 3 дня", "📅 Погода на неделю"],
-                    ["🗺️ Текущая локация", "❓ Помощь"]
-                ], resize_keyboard=True)
+                reply_markup = self.keyboard_markup
             )
 
     def get_wind_direction(self, degrees):
@@ -269,7 +264,7 @@ class WeatherBot:
     
     async def send_weather_forecast(self, update: Update, context: ContextTypes.DEFAULT_TYPE, days=3):
         """Отправка прогноза погоды"""
-        await update.message.reply_text("⏳ Получаю актуальные данные о погоде...")
+        await update.message.reply_text("⏳ Получаю актуальные данные о погоде...", reply_markup = self.keyboard_markup)
         
         user_id = update.message.from_user.id
         lat,lon = self.get_user_location_db(user_id)
@@ -282,7 +277,8 @@ class WeatherBot:
         if not weather_data:
             await update.message.reply_text(
                 "❌ Не удалось получить данные о погоде. "
-                "Попробуйте позже или проверьте настройки API."
+                "Попробуйте позже или проверьте настройки API.",
+                reply_markup = self.keyboard_markup
             )
             return
         
@@ -315,7 +311,7 @@ class WeatherBot:
         response_text += f"📍 *Координаты:* {lat}, {lon}\n"
         response_text += "🕒 *Обновлено:* " + datetime.now().strftime("%d.%m.%Y %H:%M")
         
-        await update.message.reply_text(response_text, parse_mode='Markdown')
+        await update.message.reply_text(response_text, parse_mode='Markdown', reply_markup = self.keyboard_markup)
     
     def run(self):
         """Запуск бота"""
