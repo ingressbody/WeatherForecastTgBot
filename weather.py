@@ -31,8 +31,8 @@ LADOGA_COORDS = {
 
 class WeatherBot:
     def __init__(self):
-        self.keyboard = [ ["🌤️ Погода на 3 дня", "🗺️ Текущая локация", "❓ Помощь"] ]     
-        self.keyboard_markup = ReplyKeyboardMarkup(self.keyboard, resize_keyboard=True)   
+        self.keyboard = [ ["🌤️ Погода на 3 дня", "🗺️ Текущая локация", "❓ Помощь"] ]
+        self.keyboard_markup = ReplyKeyboardMarkup(self.keyboard, resize_keyboard=True)
         self.application = Application.builder().token(BOT_TOKEN).build()
         self.setup_handlers()
         conn = sqlite3.connect("usersdb.sqlite", isolation_level=None)
@@ -74,7 +74,7 @@ class WeatherBot:
         """Обработчик команды /location"""
         user_id = update.message.from_user.id
         lat,lon = self.get_user_location_db(user_id)
-        if lat and lon:                
+        if lat and lon:
             await update.message.reply_text(f"Текущие координаты: {lat}, {lon}", reply_markup = self.keyboard_markup)
         else:
             await update.message.reply_text("Координаты не заданы", reply_markup = self.keyboard_markup)
